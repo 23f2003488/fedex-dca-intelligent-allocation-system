@@ -15,6 +15,28 @@ model = joblib.load(MODEL_PATH)
 
 st.success("Model loaded successfully!")
 
+dca_profiles = {
+    "DCA_A": {"strength": "high_value", "effectiveness": 0.90},
+    "DCA_B": {"strength": "medium_value", "effectiveness": 0.80},
+    "DCA_C": {"strength": "low_value", "effectiveness": 0.70},
+}
+
+def recommend_dca(recovery_probability, outstanding_amount):
+    scores = {}
+
+    for dca, profile in dca_profiles.items():
+        score = recovery_probability * profile["effectiveness"]
+
+        if outstanding_amount > 50000 and profile["strength"] == "high_value":
+            score *= 1.1
+        elif outstanding_amount <= 50000 and profile["strength"] == "low_value":
+            score *= 1.05
+
+        scores[dca] = score
+
+    best_dca = max(scores, key=scores.get)
+    return best_dca, scores
+
 st.header("Enter Case Details")
 
 customer_age = st.number_input("Customer Age", min_value=18, max_value=100, value=35)
@@ -48,7 +70,29 @@ input_df = pd.DataFrame([{
 }])
 
 
-if st.button("Predict Recovery Probability"):
+if st.button("Predict & Recommend DCA"):
     prob = model.predict_proba(input_df)[0][1]
+    best_dca, dca_scores = recommend_dca(prob, loan_amnt)
+
     st.subheader("Prediction Result")
     st.write(f"Recovery Probability: **{prob:.2f}**")
+
+    st.subheader("Recommended DCA")
+    st.success(best_dca)
+
+    st.subheader("DCA Scores")
+    st.json(dca_scores)
+
+    st.subheader("DCA Score Comparison")
+
+    dca_df = pd.DataFrame(
+        list(dca_scores.items()),
+        columns=["DCA", "Score"]
+    )
+
+    st.bar_chart(dca_df.set_index("DCA"))
+
+    st.caption(
+    "The system recommends the DCA with the highest expected recovery score, "
+    "computed using predicted recovery probability and historical DCA effectiveness."
+    )
